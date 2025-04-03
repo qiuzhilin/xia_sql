@@ -36,6 +36,7 @@
 
 <img width="1526" alt="image" src="https://user-images.githubusercontent.com/30351807/217544602-fc770d5a-235d-4f2d-b636-c782a6c222c6.png">
 **********
+
 ### 2025-4-3
 #### xia SQL 4.0
 * 优化检测白名单：String[] static_file = {"jpg","png","gif","css","js","pdf","mp3","mp4","avi","webp","woff","woff2","doc","docx","csv","xls","xlsx","map","svg"};。
