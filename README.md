@@ -39,9 +39,17 @@
 
 ### 2025-4-3
 #### xia SQL 4.0
-* 优化检测白名单：String[] static_file = {"jpg","png","gif","css","js","pdf","mp3","mp4","avi","webp","woff","woff2","doc","docx","csv","xls","xlsx","map","svg"};。
+##### 新增：
 * 允许自动添加额外的参数以及数值
 * poc应该成对存在,然后比对poc返回不同的数据,可自定义输入成对的poc
+##### 优化：
+* 优化检测白名单：String[] static_file = {"jpg","png","gif","css","js","pdf","mp3","mp4","avi","webp","woff","woff2","doc","docx","csv","xls","xlsx","map","svg"};。
+* 左上侧请求日志表格可拖拉
+* 原始包长度全局变量original_data_len线程安全问题
+
+
+
+
 
 **********
 ### 2023-5-18
