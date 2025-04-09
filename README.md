@@ -37,6 +37,15 @@
 <img width="1526" alt="image" src="https://user-images.githubusercontent.com/30351807/217544602-fc770d5a-235d-4f2d-b636-c782a6c222c6.png">
 **********
 
+### 2025-4-9
+#### xia SQL 4.1
+##### 优化：
+* 支持额外参数组合，参考样例：pageNum=1&pageSize=5&orderByColumn=aaa
+* 额外参数支持应用到POST请求，json体，目前，额外参数只追加到json体的第一层
+* 取消额外参数应用payload
+* 修复json 体无法注入payload的bug,重构json参数注入逻辑
+**********
+
 ### 2025-4-3
 #### xia SQL 4.0
 ##### 新增：
