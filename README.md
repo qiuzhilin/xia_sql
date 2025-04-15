@@ -37,6 +37,17 @@
 <img width="1526" alt="image" src="https://user-images.githubusercontent.com/30351807/217544602-fc770d5a-235d-4f2d-b636-c782a6c222c6.png">
 **********
 
+### 2025-4-15
+#### xia SQL 4.2
+##### 优化：
+* 修复json体参数注入bug
+* 支持自定义json体payload的层级，防止超深度带来的性能问题
+##### 新增：
+* 新增时间盲注支持
+* 时间盲注的判断条件：payload数组中只能有一个元素，并包含sleep  waitfor字符串 例如：["'||pg_sleep(3)--"]
+* 如果payload 响应时间超过 延迟的时间，判定为可能存在注入，
+**********
+
 ### 2025-4-9
 #### xia SQL 4.1
 ##### 优化：
