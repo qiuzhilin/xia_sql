@@ -1,41 +1,30 @@
 package org.burp;
 
 import burp.*;
+import com.alibaba.fastjson.JSONPath;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONObject;
 import org.apache.commons.lang3.StringUtils;
 
-import java.io.*;
-import java.security.MessageDigest;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ItemEvent;
-import java.net.URL;
-import java.util.*;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTabbedPane;
-import javax.swing.JTable;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-import javax.swing.JMenuItem;
+import java.io.*;
+import java.net.URL;
+import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Map;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 
 public class BurpExtender extends AbstractTableModel implements IBurpExtender, ITab, IHttpListener,IScannerCheck, IMessageEditorController,IContextMenuFactory
 {
@@ -71,6 +60,7 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
     String customParamsTextAreaData = "";//文本域的内容
     int JTextAreaCustomParams= 0;//自定义参数开关  0关 1开
     int customParamsAddpayload= 0;//自定义参数开关  0关 1开
+    int Payloadlayers = 0;
 
 
     //
@@ -136,9 +126,9 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                 jp.add(splitlogPane);
                 //侧边复选框
                 JPanel jps=new JPanel();
-                jps.setLayout(new GridLayout(18, 1)); //六行一列
+                jps.setLayout(new GridLayout(16, 1)); //六行一列
                 JLabel jls=new JLabel("插件名：瞎注 author：算命縖子");    //创建一个标签
-                JLabel jls_1=new JLabel("blog:www.nmd5.com");    //创建一个标签
+               // JLabel jls_1=new JLabel("blog:www.nmd5.com");    //创建一个标签
                 JLabel jls_2=new JLabel("版本：xia SQL V4.1");    //创建一个标签
                 JLabel jls_3=new JLabel("感谢名单：Moonlit、阿猫阿狗、Shincehor");    //创建一个标签
                 JCheckBox chkbox1=new JCheckBox("启动插件", true);    //创建指定文本和状态的复选框
@@ -155,6 +145,15 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                 JButton customParamsPersistBtn=new JButton("持久化额外参数");    //创建JButton对象
                 JLabel jls_5=new JLabel("如果需要多个域名加白请用,隔开");    //创建一个标签
                 JTextField textField = new JTextField("填写白名单域名");//白名单文本框
+                // 创建下拉框（JComboBox）选项
+                String[] options = {"不限", "1", "2", "3", "4","5","6"};
+                JComboBox<String> comboBox = new JComboBox<>(options);
+                comboBox.setSelectedIndex(0);
+                JLabel jComboBoxlabel=new JLabel("JSON参数payload最大深度:");
+                JPanel jComboBoxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+                // 设置默认选择项为“全部”
+                jComboBoxPanel.add(jComboBoxlabel);
+                jComboBoxPanel.add(comboBox);
 
 
                 JButton btn1=new JButton("清空列表");    //创建JButton对象
@@ -291,7 +290,15 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                         }
                     }
                 });
-
+                // 添加监听器
+                comboBox.addActionListener(e -> {
+                    String selected = (String) comboBox.getSelectedItem();
+                    if ("不限".equals(selected)) {
+                        Payloadlayers = 0;
+                    } else {
+                        Payloadlayers = Integer.parseInt(selected);
+                    }
+                });
                 customParamsCheckbox.addItemListener(new ItemListener() {
                     @Override
                     public void itemStateChanged(ItemEvent e) {
@@ -456,7 +463,7 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                     }
                 });
                 jps.add(jls);
-                jps.add(jls_1);
+                //jps.add(jls_1);
                 jps.add(jls_2);
                // jps.add(jls_3);
                 jps.add(chkbox1);
@@ -472,6 +479,8 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                 jps.add(chkbox5);
                 jps.add(chkbox6);
                 jps.add(chkbox7);
+                jps.add(jComboBoxPanel);
+
                // jps.add(customParamsCheckbox);
                 jps.add(btn2);
 
@@ -498,7 +507,7 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                 //整体分布
                 splitPane.setLeftComponent(splitPanes);//添加在左面
                 splitPane.setRightComponent(splitPanes_2);//添加在右面
-                splitPane.setDividerLocation(1000);//设置分割的大小
+                splitPane.setDividerLocation(1500);//设置分割的大小
 
                 // customize our UI components
                 callbacks.customizeUiComponent(splitPane);
@@ -738,9 +747,15 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                     List<String> bodyPaths=new ArrayList<>();
                     CommonUtil.extractPaths(bodyJson,"",bodyPaths);
                     for(String path : bodyPaths){
+
+                        //超过设置的payload层数，不操作
+                        if(Payloadlayers>0){
+                            String[] keys=path.split("\\.");
+                            if(keys.length>Payloadlayers+1) continue;
+                        }
                         //获取该path的值
-                        Object vauleOfPath=CommonUtil.getValueByPath(bodyJson,path);
-                        change_sign_1 = execPlayLoad(baseRequestResponse,path,String.valueOf(vauleOfPath),toolFlag,temp_data,IParameter.PARAM_JSON,bodyJson);
+                        Object vauleOfPath= JSONPath.read(bodyJSONStr,"$"+path);
+                        change_sign_1 = execPlayLoad(baseRequestResponse,path,String.valueOf(vauleOfPath),toolFlag,temp_data,IParameter.PARAM_JSON,bodyJSONStr);
                     }
                 }catch (Exception e) {
                     return;
@@ -835,7 +850,8 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
         Map<String, String> paramMap = paraList.stream()
                 .collect(Collectors.toMap(
                         IParameter::getName,
-                        p -> String.valueOf(p.getValue())
+                        p -> String.valueOf(p.getValue()),
+                        (v1, v2) -> v1  // 保留第一个
                 ));
         JSONObject json = new JSONObject();
         String[] pairs = curstomParam.split("&");
@@ -861,12 +877,8 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
     }
 
 
-    public String execPlayLoad(IHttpRequestResponse baseRequestResponse,String key,String value,int toolFlag,String recoreMd5,byte paraType,JSONObject originalObj){
-        // 浅拷贝
-        JSONObject newObj =null;
-        if(originalObj!=null){
-            newObj = new JSONObject(originalObj);
-        }
+    public String execPlayLoad(IHttpRequestResponse baseRequestResponse,String key,String value,int toolFlag,String recoreMd5,byte paraType,String originalObj){
+
         String finalSign = "";
         int original_data_len = callbacks.saveBuffersToTempFiles(baseRequestResponse).getResponse().length;
         byte[] new_Request = baseRequestResponse.getRequest();
@@ -902,6 +914,7 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
             // Parse the JSON array
             try {
                 int change=0;
+                int sleepTime = 0;
                 //判断数据长度是否会变化
                 String change_sign;//第二个表格中 变化 的内容
                 JSONArray jsonArray = JSONArray.parseArray(valuesPart);
@@ -909,6 +922,14 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                     int time_1 = 0,time_2 = 0;
                     String payload = jsonArray.getString(i); // Extract each value
                     stdout.println("payload: " + payload);
+                    //判断payload是否存在sleep ,waitfor 等字段
+                    if(jsonArray.size()==1&&(payload.contains("sleep")||payload.contains("waitfor"))){
+                        //paylaod数组中只有一个值的时候并包含sleep ,waitfor 字符，判断为时间盲注
+                        sleepTime=CommonUtil.getMaxNumberFromString(payload);
+                        if(sleepTime<1){
+                            break;
+                        }
+                    }
                     if(JTextArea_int == 1){
                         //自定义payload //参数值为空
                         if(diy_payload_2 == 1){
@@ -917,10 +938,13 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                             }
                         }
                     }
-                    if(newObj != null){
+                    if(originalObj != null){
+                        // 浅拷贝
+                        JSONObject newObj=JSONObject.parseObject(originalObj);
                         //是json参数格式，替换对应key
                         String payloadStr=value+payload;
-                        CommonUtil.updateValueByPath(newObj, key, payloadStr);
+                       // CommonUtil.updateValueByPath(newObj, key, payloadStr);
+                        JSONPath.set(newObj,"$"+key,payloadStr);
                         byte[] newRequest =helpers.buildHttpMessage( helpers.analyzeRequest(baseRequestResponse).getHeaders(),newObj.toString().getBytes());
                         time_1 = (int) System.currentTimeMillis();
                         requestResponse = callbacks.makeHttpRequest(iHttpService, newRequest);//发送请求
@@ -957,14 +981,27 @@ public class BurpExtender extends AbstractTableModel implements IBurpExtender, I
                         }
                     }
                     if(jsonArray.size()==1){
-                        //只有一个payload的情况下，直接跟原始返回大小比对，如果不同，设为存疑
-                        if(change!=original_data_len){
-                            change_sign = "✔ ==> ?";
-                            finalSign = "✔";
-                        }else{
-                            //第一次包和第二次包的长度一样
-                            change_sign = "";
+                        //只有一个payload的情况下
+                        if(sleepTime>0){
+                            //时间盲注
+                            if ((time_2 - time_1) > (sleepTime)*1000) {
+                                //响应应时间 大于payload的值
+                                change_sign = "✔ ==> ?";
+                                finalSign = "✔";
+                            } else {
+                                change_sign = "";
+                            }
+                        }else {
+                            //,普通注入，直接跟原始返回大小比对，如果不同，设为存疑
+                            if(change!=original_data_len){
+                                change_sign = "✔ ==> ?";
+                                finalSign = "✔";
+                            }else{
+                                //第一次包和第二次包的长度一样
+                                change_sign = "";
+                            }
                         }
+
                     }
                     log2.add(new LogEntry(conut,toolFlag, callbacks.saveBuffersToTempFiles(requestResponse),helpers.analyzeRequest(requestResponse).getUrl(),key,value+payload,change_sign,recoreMd5,time_2-time_1,"end",helpers.analyzeResponse(requestResponse.getResponse()).getStatusCode()));
                 }

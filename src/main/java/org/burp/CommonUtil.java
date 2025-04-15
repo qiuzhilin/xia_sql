@@ -1,164 +1,132 @@
 package org.burp;
 
 
-
+import com.alibaba.fastjson.JSONPath;
+import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 public class CommonUtil {
+    public static void main(String[] args) {
+        String jsonstr="{\n" +
+                "  \"string_example\": \"Hello, world!\",\n" +
+                "  \"number_integer\": 42,\n" +
+                "  \"number_float\": 3.14159,\n" +
+                "  \"boolean_true\": true,\n" +
+                "  \"boolean_false\": false,\n" +
+                "  \"null_value\": null,\n" +
+                "  \"object_example\": {\n" +
+                "    \"nested_string\": \"Nested value\",\n" +
+                "    \"nested_number\": 100,\n" +
+                "    \"nested_array\": [1, 2, 3],\n" +
+                "    \"deep_object\": {\n" +
+                "      \"level_2_key\": \"Level 2 value\",\n" +
+                "      \"level_2_array\": [\n" +
+                "        {\n" +
+                "          \"id\": 1,\n" +
+                "          \"name\": \"Alice\"\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"id\": 2,\n" +
+                "          \"name\": \"Bob\"\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  },\n" +
+                "  \"array_example\": [\n" +
+                "    \"item1\",\n" +
+                "    123,\n" +
+                "    false,\n" +
+                "    null,\n" +
+                "    {\n" +
+                "      \"inner_object_key\": \"inner value\",\n" +
+                "      \"inner_array\": [10, 20, 30],\n" +
+                "      \"info\": {\n" +
+                "        \"author\": \"John Doe\",\n" +
+                "        \"version\": 1.0,\n" +
+                "        \"active\": true,\n" +
+                "        \"tags\": [\"example\", \"test\", \"json\"]\n" +
+                "      }\n" +
+                "    },\n" +
+                "    [\n" +
+                "      \"nested array item1\",\n" +
+                "      {\n" +
+                "        \"deep_nested\": \"yes\"\n" +
+                "      }\n" +
+                "    ]\n" +
+                "  ]\n" +
+                "}\n";
+        JSONObject obj = JSON.parseObject(jsonstr);
+        List<String>  path=new ArrayList<>();
+        extractPaths(obj," ",path);
+        for(String s:path){
+            System.out.println(s);
+            String tres1= String.valueOf(JSONPath.read(jsonstr,"$"+s));
+            System.out.println(tres1);
+            JSONPath.set(obj,"$"+s,tres1+"888");
+
+        }
+        //JSONPath.set(obj,"$.array_example[4].inner_object_key","no");
+        System.out.println(obj);
+    }
+
     /**
-     * 递归提取JSON对象中的所有路径
-     * @param obj 要提取路径的JSON对象或数组
-     * @param currentPath 当前处理的路径
-     * @param paths 存储提取出的路径列表
+     * 提取json 路径
+     * @param obj
+     * @param currentPath
+     * @param paths
      */
     public static void extractPaths(Object obj, String currentPath, List<String> paths) {
-        // 处理JSON对象的情况
         if (obj instanceof JSONObject) {
+            // 遍历 JSONObject 对象
             JSONObject jsonObject = (JSONObject) obj;
-            // 遍历JSON对象中的所有key
-            for (String key : jsonObject.keySet()) {
-                Object value = jsonObject.get(key);
-                // 构建新路径：如果当前路径为空则直接使用key，否则用点号连接
-                String newPath = currentPath.isEmpty() ? key : currentPath + "." + key;
-                // 移除中间路径，只保留到叶子节点的完整路径
-                paths.remove(currentPath);
-                paths.add(newPath);
-                // 递归处理嵌套结构
-                extractPaths(value, newPath, paths);
+            Iterator<Map.Entry<String, Object>> iterator = jsonObject.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<String, Object> entry = iterator.next();
+                extractPaths(entry.getValue(), currentPath + "." + entry.getKey(), paths);
             }
         } else if (obj instanceof JSONArray) {
+            // 遍历 JSONArray 数组
             JSONArray jsonArray = (JSONArray) obj;
-            // 只处理非空数组(使用第一个元素作为模板)
-            if (!jsonArray.isEmpty()) {
+            //数组内是同一类型，只获取第一个元素payloay
+            if(isSameTypeArray(jsonArray)) {
+                // 获取第一个元素的路径
                 Object firstElement = jsonArray.get(0);
-                // 在路径后添加数组索引标记
-                String newPath = currentPath + "[0]";
-                // 移除中间路径
-                paths.remove(currentPath);
-                paths.add(newPath);
-                // 递归处理数组元素
-                extractPaths(firstElement, newPath, paths);
+                // 如果第一个元素是 JSONObject 或 JSONArray，递归处理
+                if (firstElement instanceof JSONObject) {
+                    extractPaths(firstElement, currentPath + "[0]", paths);
+                } else if (firstElement instanceof JSONArray) {
+                    extractPaths(firstElement, currentPath + "[0]", paths);
+                }else{
+                    paths.add(currentPath+"[0]");
+                }
+            }else {
+                for (int i = 0; i < jsonArray.size(); i++) {
+                    extractPaths(jsonArray.get(i), currentPath + "[" + i + "]", paths);
+                }
             }
+        } else {
+            // 如果是叶子节点，添加路径
+            paths.add(currentPath);
         }
     }
+    // 判断数组内的所有元素是否是同一类型
+    public static boolean isSameTypeArray(JSONArray jsonArray) {
+        if (jsonArray.isEmpty()) return true;  // 空数组视为相同类型
 
-    /**
-     * 根据指定路径更新JSON结构中的值
-     * 处理三种路径格式:
-     * 1. 简单路径("key")
-     * 2. 点号路径("parent.child")
-     * 3. 数组路径("array[0].property" 或 "array[0][1]")
-     */
-    public static void updateValueByPath(JSONObject jsonObject, String path, Object newValue) {
-        // 特殊情况：直接数组访问(如"skills[0]")
-        if (path.contains("[") && !path.contains(".")) {
-            String arrayKey = path.substring(0, path.indexOf("["));
-            int index = Integer.parseInt(path.substring(path.indexOf("[") + 1, path.indexOf("]")));
-            ((JSONArray) jsonObject.get(arrayKey)).set(index, newValue);
-            return;
-        }
-
-        // 将路径拆分为组件以便分层导航
-        String[] keys = path.split("\\.");
-        Object currentObj = jsonObject;
-
-        // 遍历路径组件(最后一个除外)
-        for (int i = 0; i < keys.length - 1; i++) {
-            String key = keys[i];
-            // 处理路径中的数组标记(如"items[0]")
-            if (key.contains("[")) {
-                String arrayKey = key.substring(0, key.indexOf("["));
-                int index = Integer.parseInt(key.substring(key.indexOf("[") + 1, key.indexOf("]")));
-
-                // 从当前对象获取数组引用
-                if (currentObj instanceof JSONObject) {
-                    currentObj = ((JSONObject) currentObj).get(arrayKey);
-                }
-
-                // 获取特定数组元素
-                if (currentObj instanceof JSONArray) {
-                    currentObj = ((JSONArray) currentObj).get(index);
-                }
-            } else {
-                // 简单对象属性访问
-                if (currentObj instanceof JSONObject) {
-                    currentObj = ((JSONObject) currentObj).get(key);
-                }
+        Object firstElement = jsonArray.get(0);
+        for (int i = 1; i < jsonArray.size(); i++) {
+            Object currentElement = jsonArray.get(i);
+            if (!firstElement.getClass().equals(currentElement.getClass())) {
+                return false; // 一旦发现类型不同，返回 false
             }
         }
-
-        // 更新最后路径组件处的值
-        String lastKey = keys[keys.length - 1];
-        // 情况1: 最后组件是数组索引(如"techStack[0]")
-        if (lastKey.contains("[")) {
-            String arrayKey = lastKey.substring(0, lastKey.indexOf("["));
-            int index = Integer.parseInt(lastKey.substring(lastKey.indexOf("[") + 1, lastKey.indexOf("]")));
-            ((JSONArray) ((JSONObject) currentObj).get(arrayKey)).set(index, newValue);
-        }
-        // 情况2: 最后组件是对象属性
-        else if (currentObj instanceof JSONObject) {
-            ((JSONObject) currentObj).put(lastKey, newValue);
-        }
-        // 情况3: 最后组件是数组索引(数字字符串)
-        else if (currentObj instanceof JSONArray) {
-            ((JSONArray) currentObj).set(Integer.parseInt(lastKey), newValue);
-        }
-    }
-
-    /**
-     * 根据路径获取JSON中的值
-     * @param jsonObject JSON对象
-     * @param path 要获取值的路径
-     * @return 路径对应的值，如果路径不存在返回null
-     */
-    public static Object getValueByPath(JSONObject jsonObject, String path) {
-        try {
-            // 特殊情况：直接数组访问(如"skills[0]")
-            if (path.contains("[") && !path.contains(".")) {
-                String arrayKey = path.substring(0, path.indexOf("["));
-                int index = Integer.parseInt(path.substring(path.indexOf("[") + 1, path.indexOf("]")));
-                return ((JSONArray) jsonObject.get(arrayKey)).get(index);
-            }
-
-            // 将路径拆分为组件以便分层导航
-            String[] keys = path.split("\\.");
-            Object currentObj = jsonObject;
-
-            // 遍历路径组件
-            for (String key : keys) {
-                if (key.contains("[")) {
-                    // 处理数组标记(如"items[0]")
-                    String arrayKey = key.substring(0, key.indexOf("["));
-                    int index = Integer.parseInt(key.substring(key.indexOf("[") + 1, key.indexOf("]")));
-
-                    // 从当前对象获取数组引用
-                    if (currentObj instanceof JSONObject) {
-                        currentObj = ((JSONObject) currentObj).get(arrayKey);
-                    }
-
-                    // 获取特定数组元素
-                    if (currentObj instanceof JSONArray) {
-                        currentObj = ((JSONArray) currentObj).get(index);
-                    }
-                } else {
-                    // 简单对象属性访问
-                    if (currentObj instanceof JSONObject) {
-                        currentObj = ((JSONObject) currentObj).get(key);
-                    }
-                }
-
-                if (currentObj == null) {
-                    return null;
-                }
-            }
-
-            return currentObj;
-        } catch (Exception e) {
-            return null; // 路径无效时返回null
-        }
+        return true;
     }
 
     /**
@@ -172,5 +140,36 @@ public class CommonUtil {
             target.put(key, source.get(key));
         }
         return target;
+    }
+
+    /**
+     * 从字符串中分析出最大的参数，
+     * @param input
+     * @return
+     */
+    public static int getMaxNumberFromString(String input) {
+        int max = 0;
+
+        if (input == null || input.isEmpty()) {
+            return -1; // 或者抛异常，看你业务需求
+        }
+
+        // 正则匹配所有正整数
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\d+");
+        java.util.regex.Matcher matcher = pattern.matcher(input);
+
+        while (matcher.find()) {
+            int number = Integer.parseInt(matcher.group());
+            if (number > max) {
+                max = number;
+            }
+        }
+
+        // 没找到数字
+        if (max == 0) {
+            return -1; // 或抛异常
+        }
+
+        return max;
     }
 }
